@@ -56,7 +56,14 @@ export async function updateUser(id: string, data: Partial<Omit<User, 'id'>>): P
     return validatedUser
 }
 
-
 export async function getUserById(id: string): Promise<User | null> {
     return users.find(user => user.id === id) || null
 }
+
+export async function updateUserById(id: string, updatedData: Partial<User>): Promise<User | null> {
+    const index = users.findIndex((user) => user.id === id);
+    if (index === -1) return null;
+  
+    users[index] = { ...users[index], ...updatedData };
+    return users[index];
+  }
