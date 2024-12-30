@@ -12,11 +12,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const users: User[] = await searchUsers(query)
-
     if (users.length === 0) {
       return NextResponse.json({ message: 'No users found' }, { status: 404 })
     }
-
     return NextResponse.json(users)
   } catch (error) {
     console.error('Error searching users:', error)
