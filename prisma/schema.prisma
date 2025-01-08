@@ -12,3 +12,12 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// schema.prisma
+
+model User {
+  id          String   @id @default(cuid()) // Automatically generate a unique ID
+  name        String   // No need to specify @db.String(255)
+  email       String   @unique // Ensure email is unique
+  phoneNumber String   // No need to specify @db.String(10)
+}
