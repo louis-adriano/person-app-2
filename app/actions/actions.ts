@@ -69,3 +69,35 @@ export async function addUser(data: Omit<User, 'id'>): Promise<User> {
   }
 }
 
+export async function updateUser(id: string, data: Partial<Omit<User, 'id'>>): Promise<User> {
+  console.log('Attempting to update user:', { id, data });
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!existingUser) {
+      throw new Error(`User with id ${id} not found`);
+    }
+
+    const updatedData = { ...existingUser, ...data };
+    const validatedUser = userSchema.parse(updatedData);
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: validatedUser,
+    });
+
+    console.log('User updated successfully:', updatedUser);
+    revalidatePath('/');
+    return updatedUser;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    throw error;
+  }
+}
+
