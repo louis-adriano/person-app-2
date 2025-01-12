@@ -4,7 +4,47 @@ import { revalidatePath } from 'next/cache'
 import { User, userSchema } from './schemas'
 import prisma from '@/lib/prisma'
 
-// ... other functions remain unchanged
+export async function searchUsers(query: string): Promise<User[]> {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        name: { contains: query },
+      },
+    });
+    return users;
+  } catch (error) {
+    console.error('Error searching users:', error);
+    throw error;
+  }
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  try {
+    await prisma.user.delete({
+      where: {
+        id: id,
+      },
+    });
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: id,
+      },
+    });
+    return user;
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    throw error;
+  }
+}
 
 export async function addUser(data: Omit<User, 'id'>): Promise<User> {
   console.log('Attempting to add user:', data);
@@ -28,6 +68,4 @@ export async function addUser(data: Omit<User, 'id'>): Promise<User> {
     throw error;
   }
 }
-
-// ... other functions remain unchanged
 
