@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ZodType } from 'zod'
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export interface ActionState<T> {
   success: boolean
@@ -46,7 +47,8 @@ export default function MutableDialog<T extends FieldValues>({
   submitButtonLabel = defaultValues ? 'Save' : 'Add',
 }: GenericDialogProps<T>) {
   const [open, setOpen] = useState(false)
-  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<T>({
     resolver: zodResolver(formSchema),
@@ -56,7 +58,7 @@ export default function MutableDialog<T extends FieldValues>({
   useEffect(() => {
     if (!open) {
       form.reset(defaultValues)
-      setFeedback(null)
+      setError(null)
     }
   }, [open, form, defaultValues])
 
@@ -66,52 +68,62 @@ export default function MutableDialog<T extends FieldValues>({
     }
 
     try {
+      setIsSubmitting(true)
+      setError(null)
       const result = await action(data)
+      
       if (result.success) {
-        setFeedback({ message: result.message || "Operation completed successfully", type: 'success' })
         setOpen(false)
-        form.reset() // Reset the form after successful submission
+        form.reset()
       } else {
-        setFeedback({ message: result.message || "Operation failed", type: 'error' })
+        setError(result.message || 'Operation failed')
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error)
-      setFeedback({ message: "An unexpected error occurred. Please check the console for more details.", type: 'error' })
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline">{triggerButtonLabel}</Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{defaultValues ? editDialogTitle : addDialogTitle}</DialogTitle>
-            <DialogDescription>
-              {dialogDescription}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={form.handleSubmit(handleSubmit)}>
-            <FormComponent form={form} />
-            <DialogFooter className="mt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {submitButtonLabel}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      {feedback && (
-        <div className={`mt-4 p-4 rounded ${feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {feedback.message}
-        </div>
-      )}
-    </>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">{triggerButtonLabel}</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{defaultValues ? editDialogTitle : addDialogTitle}</DialogTitle>
+          <DialogDescription>
+            {dialogDescription}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(handleSubmit)}>
+          <FormComponent form={form} />
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="mt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Submitting...' : submitButtonLabel}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

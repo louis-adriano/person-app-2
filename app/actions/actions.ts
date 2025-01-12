@@ -3,101 +3,113 @@
 import { revalidatePath } from 'next/cache'
 import { User, userSchema } from './schemas'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
-export async function searchUsers(query: string): Promise<User[]> {
+export async function addUser(data: Omit<User, 'id'>): Promise<User> {
   try {
-    const users = await prisma.user.findMany({
+    // First validate the input data
+    const validationResult = userSchema.safeParse(data)
+    if (!validationResult.success) {
+      console.error('Validation error:', validationResult.error)
+      throw new Error(`Validation failed: ${validationResult.error.message}`)
+    }
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
       where: {
-        name: { contains: query },
+        email: data.email,
       },
-    });
-    return users;
+    })
+
+    if (existingUser) {
+      throw new Error('A user with this email already exists')
+    }
+
+    // Create the user
+    const newUser = await prisma.user.create({
+      data: validationResult.data,
+    })
+
+    console.log('User created successfully:', newUser)
+    revalidatePath('/')
+    return newUser
   } catch (error) {
-    console.error('Error searching users:', error);
-    throw error;
+    console.error('Error in addUser:', error)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        throw new Error('A user with this email already exists')
+      }
+    }
+    throw new Error(error instanceof Error ? error.message : 'Failed to add user')
+  }
+}
+
+export async function updateUser(id: string, data: Partial<Omit<User, 'id'>>): Promise<User> {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+    })
+
+    if (!existingUser) {
+      throw new Error(`User with id ${id} not found`)
+    }
+
+    const updatedData = { ...existingUser, ...data }
+    const validationResult = userSchema.safeParse(updatedData)
+    
+    if (!validationResult.success) {
+      throw new Error(`Validation failed: ${validationResult.error.message}`)
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: validationResult.data,
+    })
+
+    revalidatePath('/')
+    return updatedUser
+  } catch (error) {
+    console.error('Error in updateUser:', error)
+    throw new Error(error instanceof Error ? error.message : 'Failed to update user')
   }
 }
 
 export async function deleteUser(id: string): Promise<void> {
   try {
     await prisma.user.delete({
-      where: {
-        id: id,
-      },
-    });
-    revalidatePath('/');
+      where: { id },
+    })
+    revalidatePath('/')
   } catch (error) {
-    console.error('Error deleting user:', error);
-    throw error;
+    console.error('Error in deleteUser:', error)
+    throw new Error(error instanceof Error ? error.message : 'Failed to delete user')
   }
 }
 
 export async function getUserById(id: string): Promise<User | null> {
   try {
-    const user = await prisma.user.findUnique({
+    return await prisma.user.findUnique({
+      where: { id },
+    })
+  } catch (error) {
+    console.error('Error in getUserById:', error)
+    throw new Error(error instanceof Error ? error.message : 'Failed to fetch user')
+  }
+}
+
+export async function searchUsers(query: string): Promise<User[]> {
+  try {
+    return await prisma.user.findMany({
       where: {
-        id: id,
+        name: {
+          contains: query,
+          mode: 'insensitive',
+        },
       },
-    });
-    return user;
+    })
   } catch (error) {
-    console.error('Error getting user by ID:', error);
-    throw error;
-  }
-}
-
-export async function addUser(data: Omit<User, 'id'>): Promise<User> {
-  console.log('Attempting to add user:', data);
-  try {
-    const validatedUser = userSchema.parse(data);
-    console.log('Validated user data:', validatedUser);
-
-    const newUser = await prisma.user.create({
-      data: validatedUser,
-    });
-
-    console.log('User added successfully:', newUser);
-    revalidatePath('/');
-    return newUser;
-  } catch (error) {
-    console.error('Error adding user:', error);
-    if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-    }
-    throw error;
-  }
-}
-
-export async function updateUser(id: string, data: Partial<Omit<User, 'id'>>): Promise<User> {
-  console.log('Attempting to update user:', { id, data });
-  try {
-    const existingUser = await prisma.user.findUnique({
-      where: { id },
-    });
-
-    if (!existingUser) {
-      throw new Error(`User with id ${id} not found`);
-    }
-
-    const updatedData = { ...existingUser, ...data };
-    const validatedUser = userSchema.parse(updatedData);
-
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: validatedUser,
-    });
-
-    console.log('User updated successfully:', updatedUser);
-    revalidatePath('/');
-    return updatedUser;
-  } catch (error) {
-    console.error('Error updating user:', error);
-    if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-    }
-    throw error;
+    console.error('Error in searchUsers:', error)
+    throw new Error(error instanceof Error ? error.message : 'Failed to search users')
   }
 }
 

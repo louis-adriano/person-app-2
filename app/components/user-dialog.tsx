@@ -5,12 +5,14 @@ import { addUser } from '@/app/actions/actions'
 import { userFormSchema, User, UserFormData } from '@/app/actions/schemas'
 import { UserForm } from './user-form'
 import MutableDialog, { ActionState } from '@/components/mutable-dialog'
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function UserDialog() {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null)
 
   const handleAddUser = async (data: UserFormData): Promise<ActionState<User>> => {
     try {
+      setError(null)
       const newUser = await addUser(data)
       return {
         success: true,
@@ -18,12 +20,9 @@ export function UserDialog() {
         data: newUser
       }
     } catch (error) {
-      console.error('Error in handleAddUser:', error)
-      let errorMessage = 'Failed to add user. Please check the console for more details.';
-      if (error instanceof Error) {
-        errorMessage += ` Error: ${error.message}`;
-      }
-      setError(errorMessage);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+      console.error('Error in handleAddUser:', errorMessage)
+      setError(errorMessage)
       return {
         success: false,
         message: errorMessage
@@ -32,7 +31,7 @@ export function UserDialog() {
   }
 
   return (
-    <>
+    <div className="space-y-4">
       <MutableDialog<UserFormData>
         formSchema={userFormSchema}
         FormComponent={UserForm}
@@ -43,11 +42,11 @@ export function UserDialog() {
         submitButtonLabel="Add User"
       />
       {error && (
-        <div className="mt-4 p-4 bg-red-100 text-red-800 rounded">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-    </>
+    </div>
   )
 }
 
