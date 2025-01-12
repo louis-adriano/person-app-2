@@ -7,12 +7,11 @@ import { UserForm } from './user-form'
 import MutableDialog, { ActionState } from '@/components/mutable-dialog'
 
 export function UserDialog() {
-  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [error, setError] = useState<string | null>(null);
 
   const handleAddUser = async (data: UserFormData): Promise<ActionState<User>> => {
     try {
       const newUser = await addUser(data)
-      setFeedback({ message: `User ${newUser.name} added successfully`, type: 'success' })
       return {
         success: true,
         message: `User ${newUser.name} added successfully`,
@@ -20,10 +19,14 @@ export function UserDialog() {
       }
     } catch (error) {
       console.error('Error in handleAddUser:', error)
-      setFeedback({ message: 'Failed to add user. Please check the console for more details.', type: 'error' })
+      let errorMessage = 'Failed to add user. Please check the console for more details.';
+      if (error instanceof Error) {
+        errorMessage += ` Error: ${error.message}`;
+      }
+      setError(errorMessage);
       return {
         success: false,
-        message: 'Failed to add user'
+        message: errorMessage
       }
     }
   }
@@ -39,9 +42,9 @@ export function UserDialog() {
         dialogDescription="Fill out the form below to add a new user."
         submitButtonLabel="Add User"
       />
-      {feedback && (
-        <div className={`mt-4 p-4 rounded ${feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {feedback.message}
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 text-red-800 rounded">
+          {error}
         </div>
       )}
     </>
