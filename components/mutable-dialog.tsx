@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { useState, useEffect } from 'react'
-import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form'
-import { Button } from "@/components/ui/button"
+import React from 'react';
+import { useState, useEffect } from 'react';
+import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form';
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,32 +13,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { zodResolver } from '@hookform/resolvers/zod'
-import { ZodType } from 'zod'
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from 'sonner';
+import { ZodType } from 'zod';
 
-export interface ActionState<T> {
-  success: boolean
-  message: string | null
-  data?: T
-}
-
+export interface ActionState <T>{
+    success: boolean;
+    message: string | null;
+    data?: T;
+  }
 interface GenericDialogProps<T extends FieldValues> {
-  formSchema: ZodType<T>
-  FormComponent: React.ComponentType<{ form: UseFormReturn<T> }>
-  action?: (data: T) => Promise<ActionState<T>>
-  triggerButtonLabel?: string
-  addDialogTitle?: string
-  editDialogTitle?: string
-  dialogDescription?: string
-  submitButtonLabel?: string
-  defaultValues?: DefaultValues<T>
+  formSchema: ZodType<T>;
+  FormComponent: React.ComponentType<{ form: UseFormReturn<T> }>;
+  action?: (data: T) => Promise<ActionState<T>>;
+  triggerButtonLabel?: string;
+  addDialogTitle?: string;
+  editDialogTitle?: string;
+  dialogDescription?: string;
+  submitButtonLabel?: string;
+  defaultValues?: DefaultValues<T>; // If present, this will indicate edit mode
 }
 
 export default function MutableDialog<T extends FieldValues>({
   formSchema,
   FormComponent,
-  action,
+  action, 
   defaultValues,
   triggerButtonLabel = defaultValues ? 'Edit' : 'Add',
   addDialogTitle = 'Add',
@@ -46,50 +44,55 @@ export default function MutableDialog<T extends FieldValues>({
   dialogDescription = defaultValues ? 'Make changes to your item here. Click save when you\'re done.' : 'Fill out the form below to add a new item.',
   submitButtonLabel = defaultValues ? 'Save' : 'Add',
 }: GenericDialogProps<T>) {
-  const [open, setOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [open, setOpen] = useState(false);
 
   const form = useForm<T>({
-    resolver: zodResolver(formSchema),
-    defaultValues,
-  })
+    resolver: async (values) => {
+      try {
+        console.log('Form values before validation:', values); // Log the form values before validation
+        const result = formSchema.parse(values);
+        console.log('Validation passed:', result); // Log the result after validation
+        return { values: result, errors: {} };
+      } catch (err: any) {
+        
+        console.log('Validation errors:', err.formErrors?.fieldErrors); // Log the validation errors
+        return { values: {}, errors: err.formErrors?.fieldErrors };
+      }
+    },
+    defaultValues: defaultValues,
+  });
 
+  // Reset the form when the dialog is closed
   useEffect(() => {
     if (!open) {
-      form.reset(defaultValues)
-      setError(null)
+      form.reset();
     }
-  }, [open, form, defaultValues])
+  }, [open, form]);
 
   async function handleSubmit(data: T) {
     if (!action) {
-      throw new Error("No action function provided")
+      throw new Error("No action function provided");
     }
 
-    try {
-      setIsSubmitting(true)
-      setError(null)
-      const result = await action(data)
-      
-      if (result.success) {
-        setOpen(false)
-        form.reset()
-      } else {
-        setError(result.message || 'Operation failed')
-      }
-    } catch (error) {
-      console.error('Error in handleSubmit:', error)
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred')
-    } finally {
-      setIsSubmitting(false)
+    console.log('calling submit');
+    const actions = await action(data);  // Call the provided action directly
+
+    console.log('actions:', actions);
+
+    if (actions.success) {
+      const toastMessage = actions.message;
+      toast.success(toastMessage);
+    } else {
+      const toastMessage = actions.message;
+      toast.error(toastMessage);
     }
+    setOpen(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">{triggerButtonLabel}</Button>
+        <Button >{triggerButtonLabel}</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -100,30 +103,14 @@ export default function MutableDialog<T extends FieldValues>({
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
           <FormComponent form={form} />
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <DialogFooter className="mt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : submitButtonLabel}
-            </Button>
-          </DialogFooter>
+          <div className="mt-4">
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Close</Button>
+              <Button type="submit">{submitButtonLabel}</Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-
