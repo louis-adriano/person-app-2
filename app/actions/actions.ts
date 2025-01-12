@@ -17,11 +17,19 @@ export async function searchUsers(query: string): Promise<User[]> {
 }
 
 export async function addUser(data: Omit<User, 'id'>): Promise<User> {
-  const validatedUser = userSchema.parse(data)
-  const newUser = await prisma.user.create({
-    data: validatedUser,
-  })
-  return newUser
+  console.log('Adding user:', data); // Add this line for debugging
+  const validatedUser = userSchema.parse(data);
+  try {
+    const newUser = await prisma.user.create({
+      data: validatedUser,
+    });
+    console.log('User added successfully:', newUser); // Add this line for debugging
+    revalidatePath('/');
+    return newUser;
+  } catch (error) {
+    console.error('Error adding user:', error); // Add this line for debugging
+    throw error; // Re-throw the error to be caught by the caller
+  }
 }
 
 export async function deleteUser(id: string): Promise<void> {

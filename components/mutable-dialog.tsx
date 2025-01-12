@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useState, useEffect } from 'react';
-import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form';
-import { Button } from "@/components/ui/button";
+import React from 'react'
+import { useState, useEffect } from 'react'
+import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form'
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -13,30 +13,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { toast } from 'sonner';
-import { ZodType } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod'
+import { ZodType } from 'zod'
 
-export interface ActionState <T>{
-    success: boolean;
-    message: string | null;
-    data?: T;
-  }
+export interface ActionState<T> {
+  success: boolean
+  message: string | null
+  data?: T
+}
+
 interface GenericDialogProps<T extends FieldValues> {
-  formSchema: ZodType<T>;
-  FormComponent: React.ComponentType<{ form: UseFormReturn<T> }>;
-  action?: (data: T) => Promise<ActionState<T>>;
-  triggerButtonLabel?: string;
-  addDialogTitle?: string;
-  editDialogTitle?: string;
-  dialogDescription?: string;
-  submitButtonLabel?: string;
-  defaultValues?: DefaultValues<T>; // If present, this will indicate edit mode
+  formSchema: ZodType<T>
+  FormComponent: React.ComponentType<{ form: UseFormReturn<T> }>
+  action?: (data: T) => Promise<ActionState<T>>
+  triggerButtonLabel?: string
+  addDialogTitle?: string
+  editDialogTitle?: string
+  dialogDescription?: string
+  submitButtonLabel?: string
+  defaultValues?: DefaultValues<T>
 }
 
 export default function MutableDialog<T extends FieldValues>({
   formSchema,
   FormComponent,
-  action, 
+  action,
   defaultValues,
   triggerButtonLabel = defaultValues ? 'Edit' : 'Add',
   addDialogTitle = 'Add',
@@ -44,73 +45,73 @@ export default function MutableDialog<T extends FieldValues>({
   dialogDescription = defaultValues ? 'Make changes to your item here. Click save when you\'re done.' : 'Fill out the form below to add a new item.',
   submitButtonLabel = defaultValues ? 'Save' : 'Add',
 }: GenericDialogProps<T>) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const form = useForm<T>({
-    resolver: async (values) => {
-      try {
-        console.log('Form values before validation:', values); // Log the form values before validation
-        const result = formSchema.parse(values);
-        console.log('Validation passed:', result); // Log the result after validation
-        return { values: result, errors: {} };
-      } catch (err: any) {
-        
-        console.log('Validation errors:', err.formErrors?.fieldErrors); // Log the validation errors
-        return { values: {}, errors: err.formErrors?.fieldErrors };
-      }
-    },
-    defaultValues: defaultValues,
-  });
+    resolver: zodResolver(formSchema),
+    defaultValues,
+  })
 
-  // Reset the form when the dialog is closed
   useEffect(() => {
     if (!open) {
-      form.reset();
+      form.reset(defaultValues)
+      setFeedback(null)
     }
-  }, [open, form]);
+  }, [open, form, defaultValues])
 
   async function handleSubmit(data: T) {
     if (!action) {
-      throw new Error("No action function provided");
+      throw new Error("No action function provided")
     }
 
-    console.log('calling submit');
-    const actions = await action(data);  // Call the provided action directly
-
-    console.log('actions:', actions);
-
-    if (actions.success) {
-      const toastMessage = actions.message;
-      toast.success(toastMessage);
-    } else {
-      const toastMessage = actions.message;
-      toast.error(toastMessage);
+    try {
+      const result = await action(data)
+      if (result.success) {
+        setFeedback({ message: result.message || "Operation completed successfully", type: 'success' })
+        setOpen(false)
+        form.reset() // Reset the form after successful submission
+      } else {
+        setFeedback({ message: result.message || "Operation failed", type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error)
+      setFeedback({ message: "An unexpected error occurred. Please check the console for more details.", type: 'error' })
     }
-    setOpen(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button >{triggerButtonLabel}</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{defaultValues ? editDialogTitle : addDialogTitle}</DialogTitle>
-          <DialogDescription>
-            {dialogDescription}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleSubmit)}>
-          <FormComponent form={form} />
-          <div className="mt-4">
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Close</Button>
-              <Button type="submit">{submitButtonLabel}</Button>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline">{triggerButtonLabel}</Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{defaultValues ? editDialogTitle : addDialogTitle}</DialogTitle>
+            <DialogDescription>
+              {dialogDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <FormComponent form={form} />
+            <DialogFooter className="mt-4">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {submitButtonLabel}
+              </Button>
             </DialogFooter>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+          </form>
+        </DialogContent>
+      </Dialog>
+      {feedback && (
+        <div className={`mt-4 p-4 rounded ${feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {feedback.message}
+        </div>
+      )}
+    </>
+  )
 }
+
